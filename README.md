@@ -29,7 +29,7 @@ This repository demonstrates a complete DevOps workflow implemented across three
 
 ---
 
-## 🏗 Project Structure
+##  Project Structure
 
 project-Devops/
 │
@@ -180,18 +180,69 @@ kubectl get endpoints devops-demo
 kubectl logs devops-demo-<pod>
 kubectl describe svc devops-demo
 
-Next Phase (Phase 4 – CI/CD with Jenkins)
-Prepared tasks include:
+---
 
-Jenkinsfile creation
+## CI/CD Pipeline – Final End-to-End Execution Result
 
-Docker build stage
+The Jenkins pipeline successfully performs:
 
-Unit test stage
+1. Checkout from GitHub  
+2. Build Docker image inside Minikube’s Docker daemon  
+3. Run lightweight placeholder tests  
+4. Deploy the Helm release `devops-demo`  
+5. Run a real smoke test against `/healthz`
 
-Helm deployment stage
+### Pipeline Output Summary
 
-Smoke test stage (curl /healthz)
+During the successful run, Jenkins executed:
+
+- `docker build` using Minikube's Docker daemon  
+- `helm upgrade --install devops-demo helm/devops-demo`  
+- Kubernetes updated the deployment:
+
+NAME READY UP-TO-DATE AVAILABLE
+devops-demo 1/1 1 1
+
+- Service is available:
+
+
+NAME TYPE CLUSTER-IP PORT(S)
+devops-demo ClusterIP 10.110.205.35 80/TCP
+
+
+### Smoke Test Results
+
+Jenkins automatically port-forwarded to the pod:
+
+
+
+kubectl port-forward devops-demo-xxxx 8082:80
+
+
+Then executed:
+
+
+
+curl http://localhost:8082/healthz
+
+
+The response returned:
+
+
+
+{"status":"ok"}
+
+
+Jenkins parsed the result and marked the build as **SUCCESS**:
+
+
+
+Smoke test passed.
+Pipeline completed successfully!
+Finished: SUCCESS
+
+
+
 
 Author
 Shimi Lieberman
