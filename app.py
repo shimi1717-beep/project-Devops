@@ -4,7 +4,8 @@ app = Flask(__name__)
 
 @app.get("/")
 def hello():
-    return "Welcome to Shimi DevOps App!", 200
+<<<<<<< HEAD
+    return "Welcome to Shimi DevOps App! (final merged)!", 200
 
 @app.get("/healthz")
 def health():
