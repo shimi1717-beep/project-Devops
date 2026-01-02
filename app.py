@@ -4,7 +4,7 @@ app = Flask(__name__)
 
 @app.get("/")
 def hello():
-    return "Hello, World! Phase3 is online.", 200
+    return "Welcome to Shimi DevOps App!", 200
 
 @app.get("/healthz")
 def health():
