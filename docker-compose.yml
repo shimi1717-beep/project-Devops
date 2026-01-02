@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  quakewatch:
+    build: .
+    image: ${DOCKERHUB_USER:-your-dockerhub-username}/quakewatch:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    # Optional persistent volume example (uncomment if you add logs/data):
+    # volumes:
+    #   - qw_logs:/var/log/quakewatch
+volumes:
+  qw_logs:

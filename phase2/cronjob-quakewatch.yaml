@@ -1,0 +1,25 @@
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quakewatch-healthcheck-cron
+  namespace: quakewatch
+spec:
+  schedule: "*/5 * * * *"  # every 5 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: healthcheck
+              image: curlimages/curl:8.8.0
+              args:
+                - /bin/sh
+                - -c
+                - >
+                  echo "Checking QuakeWatch..."; 
+                  curl -sS quakewatch-service.quakewatch.svc.cluster.local/healthz || echo "Health check failed";
+          restartPolicy: OnFailure
+
