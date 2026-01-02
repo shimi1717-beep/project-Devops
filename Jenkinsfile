@@ -2,10 +2,13 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = "devops-demo"
-        IMAGE_NAME = "shimi/devops-demo-app"
-        IMAGE_TAG = "latest"
-        CHART_PATH = "helm/devops-demo"
+        APP_NAME   = 'devops-demo'
+        IMAGE_NAME = 'shimi/devops-demo-app'
+        IMAGE_TAG  = 'latest'
+        CHART_PATH = 'helm/devops-demo'
+
+        // Adjust if your binaries are elsewhere, but on mac usually these two cover:
+        TOOLS_PATH = '/opt/homebrew/bin:/usr/local/bin'
     }
 
     stages {
@@ -16,19 +19,20 @@ pipeline {
             }
         }
 
-        stage('Set Minikube Docker Env') {
-            steps {
-                sh 'echo "Switching Docker client to Minikube..."'
-                sh 'eval $(minikube docker-env)'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 sh '''
+                # Make sure Jenkins sees docker + minikube + kubectl + helm
+                export PATH=$TOOLS_PATH:$PATH
+
+                echo "Using docker      at: $(which docker || echo not-found)"
+                echo "Using minikube    at: $(which minikube || echo not-found)"
+
+                echo "Switching Docker client to Minikube..."
+                eval "$(minikube docker-env)"
+
                 echo "Building Docker image..."
-                eval $(minikube docker-env)
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                docker build -t $IMAGE_NAME:$IMAGE_TAG .
                 '''
             }
         }
@@ -36,10 +40,11 @@ pipeline {
         stage('Unit Tests') {
             steps {
                 sh '''
-                echo "Running basic tests..."
+                export PATH=$TOOLS_PATH:$PATH
+
+                echo "Running placeholder tests..."
                 python3 - <<EOF
-import requests
-print("No real tests implemented, but placeholder exists.")
+print("Tests placeholder – in a real project you would run pytest or unit tests here.")
 EOF
                 '''
             }
@@ -48,10 +53,17 @@ EOF
         stage('Deploy with Helm') {
             steps {
                 sh '''
+                export PATH=$TOOLS_PATH:$PATH
+
                 echo "Deploying application with Helm..."
-                helm upgrade --install ${APP_NAME} ${CHART_PATH} \
-                    --set image.repository=${IMAGE_NAME} \
-                    --set image.tag=${IMAGE_TAG}
+                helm upgrade --install $APP_NAME $CHART_PATH \
+                    --set image.repository=$IMAGE_NAME \
+                    --set image.tag=$IMAGE_TAG
+
+                echo "Current deployments:"
+                kubectl get deploy
+                echo "Current services:"
+                kubectl get svc
                 '''
             }
         }
@@ -59,19 +71,34 @@ EOF
         stage('Smoke Test') {
             steps {
                 sh '''
-                echo "Running smoke test via port-forward..."
-                POD=$(kubectl get pods -l app.kubernetes.io/name=${APP_NAME} -o jsonpath="{.items[0].metadata.name}")
-                kubectl port-forward $POD 8082:80 &
+                export PATH=$TOOLS_PATH:$PATH
 
-                # Sleep to give port-forward time to bind
+                echo "Finding pod for app: $APP_NAME"
+                POD=$(kubectl get pods -l app.kubernetes.io/name=$APP_NAME -o jsonpath="{.items[0].metadata.name}")
+                echo "Found pod: $POD"
+
+                echo "Starting port-forward on 8082 -> 80"
+                kubectl port-forward "$POD" 8082:80 >/tmp/port-forward.log 2>&1 &
+                PF_PID=$!
                 sleep 5
 
-                STATUS=$(curl -s http://localhost:8082/healthz | jq -r .status)
+                echo "Calling /healthz..."
+                RESPONSE=$(curl -s http://localhost:8082/healthz || echo '')
 
-                echo "Health check response: $STATUS"
+                echo "Response: $RESPONSE"
+
+                STATUS=$(printf "%s" "$RESPONSE" | python3 -c "import sys, json; \
+import traceback; \
+data=sys.stdin.read().strip(); \
+print(json.loads(data).get('status', 'missing')) if data else print('missing')" )
+
+                echo "Parsed status: $STATUS"
+
+                # Clean up port-forward
+                kill $PF_PID || true
 
                 if [ "$STATUS" != "ok" ]; then
-                    echo "Smoke test failed!"
+                    echo "Smoke test failed! Expected status=ok"
                     exit 1
                 fi
 
@@ -83,11 +110,13 @@ EOF
 
     post {
         success {
-            echo "Pipeline completed successfully!"
+            echo 'Pipeline completed successfully!'
         }
         failure {
-            echo "Pipeline failed!"
+            echo 'Pipeline failed!'
         }
     }
 }
 
+
+              
